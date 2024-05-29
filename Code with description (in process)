@@ -1,0 +1,308 @@
+library(chipseq)
+#NOW WE WILL GENERATE BIN
+#We will tile the genome into non-overlapping bins of size 200 bp or 400bp. To this end we need the information about chromosome sizes in the mouse genome (assembly mm9). In the data package, we provide the object si (strand information), which holds these data. The reader can find the code necessary to create the si object in the Obtaining si* object for *mm9** of the Bioconductor Appendix.
+
+data(si)
+si
+#change the chromosom number 'chr5' according to the gene alignment, in this case CD36 is on chr5 so we use chr5 in this code
+
+binsize = 200
+bins = tileGenome(si['chr5'], tilewidth=binsize,
+                  cut.last.tile.in.chrom=TRUE)
+bins
+#We now count how many reads fall into each bin. For this purpose, we define the function BinChIPseq. It takes two arguments, reads and bins which are GRanges objects.
+BinChIPseq = function( reads, bins ){
+
+       mcols(bins)$score = countOverlaps( bins, reads ) 
+       return( bins ) 
+}
+#Now we apply it to the objects input, rep1 and rep2. We obtain input.200bins, TET1SH.200bins and TET1SC.200bins
+input.200bins = BinChIPseq( input, bins )
+REP1.200bins = BinChIPseq( REP1, bins )
+REP2.200bins = BinChIPseq( REP2, bins )
+REP3.200bins = BinChIPseq( REP3, bins )
+REP4.200bins = BinChIPseq( REP4, bins )
+
+#IF YOU WANT TO GIVE A LOOK WHETHER OR NOT BINNING IS SUCCESSFUL GIVE A COMMAND
+
+REP1.200bins
+REP2.200bins
+REP3.200bins
+REP4.200bins
+input.200bins
+
+#We can plot coverage for 1000 bins, starting from bin 200,000.
+
+plot( 200000:201000, REP1.200bins$score[200000:201000], 
+   xlab="chr5", ylab="counts per bin" )
+plot( 200000:201000, REP2.200bins$score[200000:201000], 
+   xlab="chr5", ylab="counts per bin" )
+
+#EXPORT BINNED DATA TO BE VISUALIZED AND SHARED
+export(input.200bins, 
+       con='input_CHR5.bedGraph',
+       format = "bedGraph")
+export(REP1.200bins, 
+       con='REP1_CHR5.bedGraph',
+       format = "bedGraph")
+export(REP2.200bins, 
+       con='REP2_CHR5.bedGraph',
+       format = "bedGraph")
+export(REP3.200bins, 
+       con='REP3_CHR5.bedGraph',
+       format = "bedGraph")
+export(REP4.200bins, 
+       con='REP4_CHR5.bedGraph',
+       format = "bedGraph")
+
+
+#Visualization of the exported files 
+#gviz is to visualize chromosom position so you must know the chromosome and position of your gene on mm9
+#load library biomart to specify the gene from ensemble database
+
+library(Gviz)
+library(biomaRt)
+# Connect to the biomart database
+mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+
+# Get the annotation for the CD36 gene
+CD36_annotation <- getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name", "start_position", "end_position"),
+                           filters = "external_gene_name",
+                           values = "CD36",
+                           mart = mart)
+
+# Ensure that the annotation data frame has the correct column names expected by AnnotationTrack
+colnames(CD36_annotation) <- c("gene_id", "symbol", "chr", "start", "end")
+
+# Create the AnnotationTrack with the correct arguments
+CD36_track <- AnnotationTrack(range = CD36_annotation, 
+                                name = "CD36", 
+                                chromosome = CD36_annotation$chr, 
+                                start = CD36_annotation$start, 
+                                end = CD36_annotation$end)
+
+#Now, create an annotation track for the CD36 gene using the obtained annotation:
+CD36_track <- AnnotationTrack(CD36_annotation, name = "CD36")
+
+#Finally, plot the tracks for the CD36 gene on chr5:
+# Set the active chromosome to chr5
+chr5 <- "chr5"
+gtrack <- GenomeAxisTrack()
+
+# Assuming CD36_track is a properly initialized track object
+AT <- GenomeAxisTrack()
+plotTracks(list(gtrack, CD36_track),
+chromosome = chr5,
+from=17986688, to=18093799,
+transcriptAnnotation="symbol", window="auto", 
+cex.title=1, fontsize=10)
+
+INPUT.track = DataTrack(input.200bins, 
+strand="*", genome="mm9", col.histogram='gray',
+fill.histogram='black', name="Input", col.axis="black",
+cex.axis=0.4, ylim=c(0,150))
+
+REP1.track = DataTrack(REP1.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP1", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,150))
+ 
+REP2.track = DataTrack(REP2.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP2", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,150))
+
+REP3.track = DataTrack(REP3.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP3", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,150))
+ 
+REP4.track = DataTrack(REP4.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP4", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,150))
+
+plotTracks(c(INPUT.track, REP1.track, REP2.track, REP3.track, REP4.track, CD36_track, AT),
+from=17986688, to=18100000,
+transcriptAnnotation="symbol", window="auto", 
+type="histogram", cex.title=0.7, fontsize=10 )
+
+INPUT.track = DataTrack(input.200bins, 
+strand="*", genome="mm9", col.histogram='gray',
+fill.histogram='black', name="Input", col.axis="black",
+cex.axis=0.4, ylim=c(0,10))
+
+REP1.track = DataTrack(REP1.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP1", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,10))
+
+REP2.track = DataTrack(REP2.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP2", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,10))
+
+REP3.track = DataTrack(REP3.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP3", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,10))
+
+REP4.track = DataTrack(REP4.200bins, 
+strand="*", genome="mm9", col.histogram='steelblue',
+fill.histogram='black', name="REP4", col.axis='steelblue',
+cex.axis=0.4, ylim=c(0,10))
+
+
+plotTracks(c(INPUT.track, REP1.track, REP2.track, REP3.track, REP4.track, CD36_track, AT),
+from=18040000, to=18100000,
+transcriptAnnotation="symbol", window="auto", 
+type="histogram", cex.title=0.7, fontsize=10 )
+#___________________________________________________________________________________
+# Highlight The Enhancer/Promotor regions 
+#Load necessary libraries
+library(Gviz)
+library(RColorBrewer)
+
+# Define the coordinates of the promoter regions for Mouse CD36
+P1 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18032801), end = c(18040801)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+P2 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18053000), end = c(18054801)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+P3 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18092400), end = c(18094001)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E1 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18025801), end = c(18030000)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E2 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18047400), end = c(18050199)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E3 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18056001), end = c(18059800)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E4 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18067801), end = c(18068800)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E5 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18079001), end = c(18083199)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+# Define the coordinates of the promoter regions for Mouse CD36
+E6 <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(18084602), end = c(18088200)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+
+# Define the coordinates of the promoter regions for Mouse CD36
+ProteinCodingRegion <- GRanges(seqnames = Rle(c("chr5")), 
+                           ranges = IRanges(start = c(17990000), end = c(18019637)), # Corrected end coordinate
+                           strand = Rle(c("*")))
+
+# Create an AnnotationTrack for the promoter regions
+P1Track <- AnnotationTrack(range = P1, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "red")
+# Create an AnnotationTrack for the promoter regions
+P2Track <- AnnotationTrack(range = P2, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "red")
+# Create an AnnotationTrack for the promoter regions
+P3Track <- AnnotationTrack(range = P3, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "red")
+# Create an AnnotationTrack for the promoter regions
+E1Track <- AnnotationTrack(range = E1, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+# Create an AnnotationTrack for the promoter regions
+E2Track <- AnnotationTrack(range = E2, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+
+# Create an AnnotationTrack for the promoter regions
+E3Track <- AnnotationTrack(range = E3, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+
+# Create an AnnotationTrack for the promoter regions
+E4Track <- AnnotationTrack(range = E4, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+
+# Create an AnnotationTrack for the promoter regions
+E5Track <- AnnotationTrack(range = E5, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+
+# Create an AnnotationTrack for the promoter regions
+E6Track <- AnnotationTrack(range = E6, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "yellow")
+
+# Create an AnnotationTrack for the ProteinTrack
+ProteinTrack <- AnnotationTrack(range = ProteinCodingRegion, 
+                                 genome = "mm9", 
+                                 name = "", 
+                                 fill = "orange")
+
+# Assuming CD36_track is a properly initialized track object
+AT <- GenomeAxisTrack()
+
+# Define a function to create a gradient fill
+gradientFill <- function(col1, col2, n) {
+    colorRampPalette(c(col1, col2))(n)
+}
+
+# Fancy DataTrack with gradient fill
+fancyDataTrack <- function(data, name, col1, col2, ylim=c(0,40)) {
+    DataTrack(data, strand="*", genome="mm9",
+              col.histogram=gradientFill(col1, col2, 100),
+              fill.histogram=gradientFill(col1, col2, 100),
+              name=name, col.axis=col1,
+              cex.axis=0.5, ylim=ylim)
+}
+
+# Create tracks with the fancyDataTrack function
+INPUT.track <- fancyDataTrack(input.200bins, "Input", 'gray', 'white')
+REP1.track <- fancyDataTrack(REP1.200bins, "REP1", 'steelblue', 'red')
+REP2.track <- fancyDataTrack(REP2.200bins, "REP2", 'steelblue', 'red')
+REP3.track <- fancyDataTrack(REP3.200bins, "REP3", 'steelblue', 'red')
+REP4.track <- fancyDataTrack(REP4.200bins, "REP3", 'steelblue', 'red')
+
+# Plot the tracks with enhanced features and the promoter track
+plotTracks(c(INPUT.track, REP1.track, REP2.track, REP3.track, REP4.track, P1Track, P2Track, P3Track, E1Track, E2Track, E3Track, E4Track, E5Track, E6Track, ProteinTrack, CD36_track, AT),
+           from=17986688, to=18100000,
+           transcriptAnnotation="symbol", window="auto", 
+           type="histogram", cex.title=0.6, fontsize=12,
+           grid=TRUE, col.grid="gray", lwd.grid=0.3)
+
+# Combine the promoter and protein coding regions into a single track
+combinedRegions <- c(P1, P2, P3, E1, E2, E3, E4, E5, E6, ProteinCodingRegion)
+combinedTrack <- AnnotationTrack(range = combinedRegions, 
+                                 genome = "mm9", 
+                                 name = "Combined Regions", 
+                                 fill = c(rep("red", 3), rep("yellow", 6), "orange"))
+
+# Corrected plotTracks call
+plotTracks(c(INPUT.track, REP1.track, REP2.track, REP3.track, REP4.track, combinedTrack, AT),
+           from=17986688, to=18100000,
+           transcriptAnnotation="symbol", window="auto", 
+           type="histogram", cex.title=0.6, fontsize=12,
+           grid=TRUE, col.grid="gray", lwd.grid=0.3,
+           stacking = "squish") # Use the 'squish' stacking mode to plot on the same axis
